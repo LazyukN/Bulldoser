@@ -6,6 +6,8 @@ import (
 	"net/http"
 )
 
+var requestCounter int
+
 func main() {
 	http.HandleFunc("/ping/", ping)
 
@@ -13,6 +15,7 @@ func main() {
 }
 
 func ping(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("ping!")
+	requestCounter++
+	fmt.Println(requestCounter)
 	fmt.Fprintf(w, "ping\n")
 }

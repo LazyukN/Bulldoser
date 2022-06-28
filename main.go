@@ -3,48 +3,48 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"runtime"
 	"sync"
 )
 
 const WORKERS = 5
-const URL = "https://rosmetallica.ru/"
+const URL = "http://localhost:8080/ping/"
 
 func main() {
-	maxRequests := 1000
+	maxRequests := 100
 
 	var successRequestCounter int
 	var requestCounter int
 	mu := new(sync.Mutex)
 	wg := new(sync.WaitGroup)
+	quit := make(chan int)
 	for i := 0; i < WORKERS; i++ {
 		wg.Add(1)
-		go func(mu *sync.Mutex, i int) {
-			quit := make(chan int)
+		go func(i int) {
 			defer wg.Done()
 			for {
 				select {
 				case <-quit:
 					return
 				default:
-					if requestCounter < maxRequests {
+					mu.Lock()
+					if requestCounter >= maxRequests {
+						go func() {
+							for j := 0; j < WORKERS; j++ {
+								quit <- 1
+							}
+						}()
+					} else {
 						_, err := http.Get(URL)
-						mu.Lock()
 						requestCounter++
 						if err == nil {
 							successRequestCounter++
 						}
-						mu.Unlock()
 						fmt.Printf("worker %d send %d request\n", i, requestCounter)
-					} else {
-						go func() {
-							quit <- 1
-						}()
 					}
+					mu.Unlock()
 				}
-				runtime.Gosched()
 			}
-		}(mu, i)
+		}(i)
 	}
 	wg.Wait()
 
