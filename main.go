@@ -15,15 +15,13 @@ const URL = "http://localhost:8080/ping/"
 
 func main() {
 	start := time.Now()
-	maxRequests := 50
+	maxRequests := 10000
 
 	var successRequestCounter int
 	var requestCounter int
 	mu := new(sync.Mutex)
-	wg := new(sync.WaitGroup)
 	quit := make(chan int)
 	run := make(chan bool)
-	wg.Add(maxRequests)
 	for i := 0; i < WORKERS; i++ {
 		go func(i int) {
 			for {
@@ -31,10 +29,8 @@ func main() {
 				case <-quit:
 					return
 				case <-run:
-
 					_, err := http.Get(URL)
 					mu.Lock()
-					wg.Done()
 					requestCounter++
 					if err == nil {
 						successRequestCounter++
@@ -45,10 +41,20 @@ func main() {
 			}
 		}(i)
 	}
+
+	checkTime := time.After(1 * time.Second)
 	for k := maxRequests; k > 0; k-- {
-		run <- true
+		stop := false
+		select {
+		case <-checkTime:
+			stop = true
+		default:
+			run <- true
+		}
+		if stop {
+			break
+		}
 	}
-	wg.Wait()
 	for j := 0; j < WORKERS; j++ {
 		quit <- 1
 	}
