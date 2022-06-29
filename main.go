@@ -4,51 +4,58 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 )
 
-const WORKERS = 5
+const WORKERS = 16
+
 const URL = "http://localhost:8080/ping/"
 
+//const URL = "https://rosmetallica.ru/"
+
 func main() {
-	maxRequests := 100
+	start := time.Now()
+	maxRequests := 50
 
 	var successRequestCounter int
 	var requestCounter int
 	mu := new(sync.Mutex)
 	wg := new(sync.WaitGroup)
 	quit := make(chan int)
+	run := make(chan bool)
+	wg.Add(maxRequests)
 	for i := 0; i < WORKERS; i++ {
-		wg.Add(1)
 		go func(i int) {
-			defer wg.Done()
 			for {
 				select {
 				case <-quit:
 					return
-				default:
+				case <-run:
+
+					_, err := http.Get(URL)
 					mu.Lock()
-					if requestCounter >= maxRequests {
-						go func() {
-							for j := 0; j < WORKERS; j++ {
-								quit <- 1
-							}
-						}()
-					} else {
-						_, err := http.Get(URL)
-						requestCounter++
-						if err == nil {
-							successRequestCounter++
-						}
-						fmt.Printf("worker %d send %d request\n", i, requestCounter)
+					wg.Done()
+					requestCounter++
+					if err == nil {
+						successRequestCounter++
 					}
+					fmt.Printf("worker %d send %d request\n", i, requestCounter)
 					mu.Unlock()
 				}
 			}
 		}(i)
 	}
+	for k := maxRequests; k > 0; k-- {
+		run <- true
+	}
 	wg.Wait()
+	for j := 0; j < WORKERS; j++ {
+		quit <- 1
+	}
 
-	defer fmt.Printf("amount requests %d\n", requestCounter)
-	defer fmt.Printf("success requests %d\n", successRequestCounter)
+	dur := time.Since(start)
+	fmt.Println("Время:", dur)
+	fmt.Printf("amount requests %d\n", requestCounter)
+	fmt.Printf("success requests %d\n", successRequestCounter)
 
 }
